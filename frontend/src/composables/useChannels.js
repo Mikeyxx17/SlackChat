@@ -26,16 +26,26 @@ export function useChannels() {
   }
 
   const createChannel = async (name) => {
-    const { token } = useAppState()
+    // 1. 从 useAppState 中把 token 和我们新写的 isGuest 都解构出来 
+    const { token, isGuest } = useAppState()
+
+    // 2. 🌟 前端铁面防线：如果是访客，直接拦截，不发送网络请求，返回 false
+    if (isGuest.value) {
+      console.warn('访客模式下无法创建新频道')
+      return false
+    }
+
     const headers = { 'Content-Type': 'application/json' }
     if (token.value) {
       headers['Authorization'] = `Bearer ${token.value}`
     }
+
     const res = await fetch('/api/channels', {
       method: 'POST',
       headers,
       body: JSON.stringify({ name }),
     })
+
     if (res.ok) {
       await fetchChannels()
       return true
