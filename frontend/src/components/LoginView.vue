@@ -122,8 +122,14 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <p class="text-sm text-base-content/60 mb-6 px-4">
+              <p class="text-sm text-base-content/60 mb-2 px-4">
                 无需注册，一键生成专属游客账号，立即体验全部聊天功能！
+              </p>
+              <p class="text-xs text-warning/80 mb-6 px-4 flex items-center justify-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+                访客账号和消息将在 24 小时后自动清除
               </p>
               <button
                 class="btn btn-primary h-12 w-full text-base rounded-field hover:scale-[1.02]"
@@ -155,7 +161,7 @@
                 <a
                   class="text-xs py-2 rounded-lg"
                   :class="theme === t.value ? 'bg-primary/15 text-primary font-semibold' : ''"
-                  @click="theme = t.value"
+                  @click="selectTheme(t.value)"
                 >{{ t.label }}</a>
               </li>
             </ul>
@@ -217,6 +223,11 @@ const handleQuickJoin = async () => {
 const switchMode = (key) => {
   mode.value = key
   authError.value = ''
+}
+
+const selectTheme = (value) => {
+  theme.value = value
+  document.activeElement?.blur()
 }
 
 const tabs = [

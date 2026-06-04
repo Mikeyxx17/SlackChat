@@ -78,7 +78,7 @@
               <a
                 class="text-xs py-2 rounded-lg"
                 :class="theme === t.value ? 'bg-primary/15 text-primary font-semibold' : ''"
-                @click="theme = t.value"
+                @click="selectTheme(t.value)"
               >
                 <span class="w-3 h-3 rounded-full border-2 shrink-0" :style="{ background: t.color, borderColor: t.border }" />
                 {{ t.label }}
@@ -132,6 +132,11 @@ const selectChannel = (name) => {
   const toggle = document.getElementById('sidebar-toggle')
   if (toggle) toggle.checked = false
   switchChannel(name)
+}
+
+const selectTheme = (value) => {
+  theme.value = value
+  document.activeElement?.blur()
 }
 
 const themes = [

@@ -16,15 +16,18 @@
 - [Vue 3](https://vuejs.org/) — Composition API + `<script setup>`
 - [Vite 8](https://vitejs.dev/) — 构建工具
 - [Tailwind CSS v4](https://tailwindcss.com/) — 原子化 CSS
-- [daisyUI v5](https://daisyui.com/) — 组件库，内置 14 款主题
+- [daisyUI v5](https://daisyui.com/) — 组件库，内置多款主题
 
 ## 功能特性
 
 - **实时消息** — 基于 WebSocket + tokio broadcast channel，消息即时送达
+- **自动重连** — WebSocket 断开后指数退避自动重连，30 秒心跳保活
 - **多频道** — 创建和切换文字频道，注册用户可创建新频道
 - **消息历史** — 每次连接自动回放最近 50 条消息
 - **JWT 认证** — 注册 / 登录，token 有效期 7 天
-- **访客模式** — 一键匿名体验，仅限 `general` 频道，token 有效期 1 天
+- **访客模式** — 一键匿名体验，仅限 `general` 频道，到期自动清理
+- **访客清理** — 后台定时任务自动删除过期访客账号及消息，事务保证原子性
+- **访客提醒** — 聊天界面顶部横幅 + 登录页面提示，告知访客数据将被自动清除
 - **14 款主题** — dark、light、cyberpunk、cupcake、synthwave、nord、sunset、winter、coffee、lemonade、luxury、business、autumn、dim
 - **会话持久化** — token 和当前频道保存在 sessionStorage，主题保存在 localStorage，刷新页面自动恢复
 - **智能滚动** — 新消息自动滚到底部，向上滚动查看历史时不打断
@@ -34,26 +37,46 @@
 
 ```
 SlackChat/
-├── backend/                  # Rust 后端
+├── backend/                      # Rust 后端
 │   ├── Cargo.toml
-│   ├── .env                  # DATABASE_URL, JWT_SECRET
-│   ├── migrations/           # SQLx 数据库迁移脚本
+│   ├── .env                      # 数据库连接、JWT 密钥、清理任务配置
+│   ├── migrations/               # SQLx 数据库迁移脚本
 │   └── src/
-│       ├── main.rs           # 入口：路由、CORS、绑定 :3000
-│       ├── auth.rs           # JWT Claims、AuthUser 提取器
-│       ├── state.rs          # AppState：PgPool + DashMap<broadcast::Sender>
-│       ├── handlers/         # 路由处理函数
-│       └── models/           # 数据模型
+│       ├── main.rs               # 入口：路由、CORS、启动清理任务、绑定 :3000
+│       ├── state.rs              # AppState：PgPool + DashMap<broadcast::Sender>
+│       ├── middleware/
+│       │   └── auth.rs           # JWT Claims、AuthUser 提取器（含数据库查活）
+│       ├── services/
+│       │   └── cleanup.rs        # 后台访客清理任务（定时删除过期账号及消息）
+│       ├── handlers/
+│       │   ├── auth.rs           # 注册、登录、访客登录、获取当前用户
+│       │   ├── channels.rs       # 频道列表、创建频道（含访客权限控制）
+│       │   └── ws.rs             # WebSocket 连接管理、消息广播、心跳处理
+│       └── models/
+│           ├── user.rs           # 用户、认证请求/响应
+│           ├── channel.rs        # 频道数据结构
+│           └── message.rs        # 聊天消息数据结构
 │
-├── frontend/                 # Vue 3 前端
+├── frontend/                     # Vue 3 前端
 │   ├── package.json
-│   ├── vite.config.js        # 开发服务器 :5173，代理 /api 和 /ws 到 :3000
+│   ├── vite.config.js            # 开发服务器 :5173，代理 /api 和 /ws 到 :3000
 │   └── src/
-│       ├── main.js           # createApp 入口
-│       ├── App.vue           # 根组件：登录 / 聊天布局切换
-│       ├── style.css         # Tailwind + daisyUI + 自定义样式
-│       ├── composables/      # 组合式函数（状态、WebSocket、频道）
-│       └── components/       # Vue 组件
+│       ├── main.js               # createApp 入口
+│       ├── App.vue               # 根组件：登录 / 聊天布局切换
+│       ├── style.css             # Tailwind + daisyUI + 自定义样式
+│       ├── composables/
+│       │   ├── useAppState.js    # 全局状态：认证、主题、会话持久化
+│       │   ├── useChannels.js    # 频道列表、创建频道
+│       │   └── useWebSocket.js   # WebSocket 连接、消息收发、自动重连、心跳
+│       └── components/
+│           ├── ChatLayout.vue     # 聊天主布局（含访客提醒横幅）
+│           ├── ChatHeader.vue     # 频道标题
+│           ├── MessageList.vue    # 消息列表（智能滚动）
+│           ├── MessageBubble.vue  # 单条消息气泡
+│           ├── MessageInput.vue   # 消息输入框
+│           ├── Sidebar.vue        # 侧边栏：频道列表、主题切换、用户信息
+│           ├── LoginView.vue      # 登录/注册/快速体验（含访客提醒）
+│           └── CreateChannelModal.vue  # 创建频道弹窗
 ```
 
 ## 数据库迁移
@@ -72,10 +95,10 @@ cargo install sqlx-cli --version 0.8.6
 
 ```bash
 # 创建新的迁移脚本
-sqlx migrate add <名称>          # 例如：sqlx migrate add add_is_guest_to_users
+sqlx migrate add <名称>
 
 # 执行所有未执行的迁移
-sqlx migrate run                 # 等同于 sqlx migrate run --source backend/migrations
+sqlx migrate run
 
 # 回滚最近一次迁移
 sqlx migrate revert
@@ -91,7 +114,7 @@ DATABASE_URL="postgres://用户名:密码@localhost/slackchat" sqlx migrate run
 
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
-| GET | `/ws/{channel}` | WebSocket 实时消息 | 否 |
+| GET | `/ws/{channel}` | WebSocket 实时消息（含心跳） | 否 |
 | GET | `/api/channels` | 获取频道列表（访客仅见 general） | JWT |
 | POST | `/api/channels` | 创建频道（访客禁止） | JWT |
 | POST | `/api/register` | 注册账号 | 否 |
@@ -103,8 +126,9 @@ DATABASE_URL="postgres://用户名:密码@localhost/slackchat" sqlx migrate run
 
 连接 `/ws/{channel}` 后：
 1. 服务端立即回放该频道最近 50 条历史消息
-2. 客户端发送 JSON：`{"channel": "name", "username": "user", "content": "text"}`
+2. 客户端发送聊天消息 JSON：`{"channel": "name", "username": "user", "content": "text"}`
 3. 服务端存入 PostgreSQL 后广播给频道内所有在线客户端
+4. 客户端每 30 秒发送心跳：`{"type": "ping"}`，服务端回复 `{"type": "pong"}`
 
 ## 快速开始
 
@@ -123,6 +147,8 @@ cd backend
 cat > .env << EOF
 DATABASE_URL=postgres://用户名:密码@localhost/slackchat
 JWT_SECRET=你的密钥
+CLEANUP_INTERVAL_SECS=1800
+GUEST_MAX_AGE_HOURS=24
 EOF
 
 # 首次运行前手动创建数据库（迁移会自动执行）
@@ -159,7 +185,8 @@ npm run build
 |------|------|--------|------|
 | `DATABASE_URL` | 是 | — | PostgreSQL 连接字符串 |
 | `JWT_SECRET` | 否 | 开发用硬编码值 | JWT 签名密钥 |
-| `PORT` | 否 | 3000 | 后端监听端口 |
+| `CLEANUP_INTERVAL_SECS` | 否 | 1800 | 访客清理任务执行间隔（秒） |
+| `GUEST_MAX_AGE_HOURS` | 否 | 24 | 访客账号最大存活时间（小时） |
 
 ## License
 

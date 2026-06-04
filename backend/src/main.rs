@@ -1,6 +1,7 @@
 // 后端服务入口 — 启动引导、路由注册、服务器绑定
 
-mod auth;
+mod middleware;
+mod services;
 mod handlers;
 mod models;
 mod state;
@@ -37,8 +38,22 @@ async fn main() {
         .await
         .expect("数据库迁移失败，请检查 SQL 脚本");
 
+    let cleanup_interval = std::env::var("CLEANUP_INTERVAL_SECS")
+        .map(|s| s.parse::<u64>().unwrap_or(1800))
+        .unwrap_or(1800);
+    let max_age_hours = std::env::var("GUEST_MAX_AGE_HOURS")
+        .map(|s| s.parse::<u64>().unwrap_or(24))
+        .unwrap_or(24);
+    tokio::spawn(services::cleanup::spawn_cleanup_task(
+        pool.clone(),
+        cleanup_interval,
+        max_age_hours,
+    ));
     let channels = Arc::new(DashMap::new());
-    let state = AppState { db: pool, channels };
+    let state = AppState {
+        db: pool.clone(),
+        channels,
+    };
 
     let cors = CorsLayer::new()
         .allow_origin(Any)

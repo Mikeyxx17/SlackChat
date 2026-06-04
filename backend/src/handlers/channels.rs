@@ -1,6 +1,6 @@
 // 频道 REST API 处理器 — GET/POST /api/channels
 
-use crate::auth::AuthUser;
+use crate::middleware::auth::AuthUser;
 use crate::models::{Channel, CreateChannelInput};
 use crate::state::AppState;
 use axum::Json;

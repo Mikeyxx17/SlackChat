@@ -19,6 +19,7 @@ pub struct User {
     pub display_name: Option<String>, // 用户自定义的唯美昵称
     pub avatar_url: Option<String>,   //头像的网络链接
     pub bio: Option<String>,          //个性签名
+    pub is_guest: bool,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 

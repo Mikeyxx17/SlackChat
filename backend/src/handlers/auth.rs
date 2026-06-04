@@ -1,7 +1,7 @@
 // 用户认证处理器 — 注册、登录
 
-use crate::auth::AuthUser;
-use crate::auth::Claims;
+use crate::middleware::auth::AuthUser;
+use crate::middleware::auth::Claims;
 use crate::models::MeResponse;
 use crate::models::{AuthResponse, LoginInput, RegisterInput, User};
 use crate::state::AppState;
@@ -40,7 +40,7 @@ pub async fn login(
 ) -> impl IntoResponse {
     let user_result = sqlx::query_as!(
         User,
-        "SELECT id, email, password_hash, username, display_name, avatar_url, bio, created_at FROM users WHERE email = $1",
+        "SELECT id, email, password_hash, username, display_name, avatar_url, bio, is_guest, created_at FROM users WHERE email = $1",
         input.email
     )
     .fetch_optional(&state.db)

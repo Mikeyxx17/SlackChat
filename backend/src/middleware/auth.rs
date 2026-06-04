@@ -1,5 +1,6 @@
 // src/auth.rs
 
+use crate::state::AppState;
 use axum::{
     extract::FromRequestParts,
     http::{StatusCode, request::Parts},
@@ -17,7 +18,7 @@ pub struct Claims {
     pub exp: usize,       // 门票截止（过期）时间戳
 }
 
-// 2. 定义我们的自定义“检票员”结构体
+// 2. 定义我们的自定义"检票员"结构体
 // 只要在别的处理器函数参数里写上 (AuthUser: AuthUser)，就代表该接口必须登录！
 #[derive(Debug)]
 pub struct AuthUser {
@@ -27,14 +28,11 @@ pub struct AuthUser {
     pub is_guest: bool, // 🌟 新增：让门票自带访客属性
 }
 
-impl<S> FromRequestParts<S> for AuthUser
-where
-    S: Send + Sync,
-{
-    type Rejection = StatusCode; // 如果检票失败，统一直接返回错误状态码
+impl FromRequestParts<AppState> for AuthUser {
+    type Rejection = StatusCode;
 
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        // 步骤一：去 HTTP 请求头的“车头”格子里寻找 Authorization [cite: 266, 270]
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
+        // 步骤一：去 HTTP 请求头的"车头"格子里寻找 Authorization [cite: 266, 270]
         let auth_header = parts
             .headers
             .get(axum::http::header::AUTHORIZATION)
@@ -68,7 +66,19 @@ where
         // 步骤五：根据验票结果进行放行或拦截
         match token_data {
             Ok(data) => {
-                // 🎟️ 门票是真的、且没过期！放行，并把用户信息打包打包变成 AuthUser [cite: 222]
+                // 确认用户是否还存在于数据库中（可能已被后台清理任务删除）
+                let exists = sqlx::query_scalar!(
+                    r#"SELECT EXISTS(SELECT 1 FROM users WHERE id = $1) as "exists!""#,
+                    data.claims.sub
+                )
+                .fetch_one(&state.db)
+                .await
+                .unwrap_or(false);
+
+                if !exists {
+                    return Err(StatusCode::UNAUTHORIZED);
+                }
+
                 Ok(AuthUser {
                     user_id: data.claims.sub,
                     username: data.claims.username,

@@ -46,6 +46,13 @@ async fn handle_socket(socket: WebSocket, state: AppState, channel_name: String)
                 match user_msg {
                     Some(Ok(msg)) => {
                         if let Message::Text(text) = msg {
+                            // 心跳：收到 ping 回 pong，跳过正常的消息解析
+                            if let Ok(ping) = serde_json::from_str::<serde_json::Value>(&text) {
+                                if ping.get("type").and_then(|v| v.as_str()) == Some("ping") {
+                                    let _ = sender.send(Message::Text("{\"type\":\"pong\"}".into())).await;
+                                    continue;
+                                }
+                            }
                             match serde_json::from_str::<ChatMessage>(&text) {
                                 Ok(mut parsed_msg) => {
                                     parsed_msg.channel = channel_name.clone();
