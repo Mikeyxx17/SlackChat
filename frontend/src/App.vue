@@ -8,12 +8,8 @@
 
 <script setup>
 import { useAppState } from './composables/useAppState'
-import { useChannels } from './composables/useChannels'
 import LoginView from './components/LoginView.vue'
 import ChatLayout from './components/ChatLayout.vue'
 
 const { isJoined, initializing } = useAppState()
-
-const { fetchChannels } = useChannels()
-fetchChannels()
 </script>
