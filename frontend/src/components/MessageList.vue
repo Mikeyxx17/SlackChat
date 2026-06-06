@@ -57,8 +57,14 @@ const onScroll = () => {
   sticky = el.scrollHeight - el.scrollTop - el.clientHeight < 50
 }
 
-// 有新消息时，仅当 sticky 才追随
+// 有新消息时：自己发的消息强制滚到底部，否则仅当 sticky 才追随
 watch(messages, () => {
+  const latest = messages.value[messages.value.length - 1]
+  if (latest && latest.username === username.value) {
+    sticky = true
+    nextTick(goBottom)
+    return
+  }
   if (sticky) nextTick(goBottom)
 }, { deep: true })
 

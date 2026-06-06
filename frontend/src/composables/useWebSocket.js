@@ -31,14 +31,13 @@ const startHeartbeat = () => {
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ type: 'ping' }))
     }
-  }, 30000) // 每30秒发一次心跳
+  }, 30000)
 }
 
 const scheduleReconnect = () => {
   clearTimers()
   if (!isJoined.value || manualDisconnect) return
 
-  // 指数退避: 1s → 2s → 4s → 8s → 16s → 最大30s
   const delay = Math.min(1000 * Math.pow(2, retryCount), 30000)
   retryCount++
   console.log(`WebSocket 将在 ${delay / 1000}s 后重连 (第${retryCount}次)`)
@@ -49,9 +48,17 @@ const scheduleReconnect = () => {
 }
 
 const connect = () => {
-  disconnect(true)
+  clearTimers()
   messages.value = []
   if (!isJoined.value) return
+
+  // 关闭旧连接前摘掉事件处理器，防止旧 socket 的 onclose 误触发重连
+  if (socket) {
+    socket.onclose = null
+    socket.onerror = null
+    socket.close()
+    socket = null
+  }
 
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   const url = protocol + '//' + location.host + '/ws/' + currentChannel.value
@@ -69,7 +76,6 @@ const connect = () => {
   ws.onmessage = (event) => {
     try {
       const msg = JSON.parse(event.data)
-      // 忽略服务端心跳回包
       if (msg.type === 'pong') return
       messages.value.push(msg)
     } catch (e) {
@@ -78,7 +84,8 @@ const connect = () => {
   }
 
   ws.onclose = () => {
-    if (socket === ws) socket = null
+    if (socket !== ws) return
+    socket = null
     connected.value = false
     clearTimers()
     if (!manualDisconnect) {
@@ -87,7 +94,8 @@ const connect = () => {
   }
 
   ws.onerror = () => {
-    if (socket === ws) socket = null
+    if (socket !== ws) return
+    socket = null
     connected.value = false
     clearTimers()
     if (!manualDisconnect) {
@@ -96,17 +104,15 @@ const connect = () => {
   }
 }
 
-const disconnect = (isInternal = false) => {
+const disconnect = () => {
   clearTimers()
+  manualDisconnect = true
+  retryCount = 0
   if (socket) {
-    if (!isInternal) {
-      manualDisconnect = true
-    }
+    socket.onclose = null
+    socket.onerror = null
     socket.close()
     socket = null
-  }
-  if (!isInternal) {
-    retryCount = 0
   }
   connected.value = false
 }

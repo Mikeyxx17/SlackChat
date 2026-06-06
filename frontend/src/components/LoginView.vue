@@ -123,7 +123,7 @@
                 </svg>
               </div>
               <p class="text-sm text-base-content/60 mb-2 px-4">
-                无需注册，一键生成专属游客账号，立即体验全部聊天功能！
+                无需注册，一键加入 #general 公开频道，仅可查看和发送消息。
               </p>
               <p class="text-xs text-warning/80 mb-6 px-4 flex items-center justify-center gap-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
